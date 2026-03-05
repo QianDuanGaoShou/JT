@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.guitar.mapper.StudyRecordMapper">
+
+    <resultMap id="StudyRecordResponseResultMap" type="com.guitar.dto.response.StudyRecordResponse">
+        <id property="id" column="id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="courseTitle" column="course_title"/>
+        <result property="coverUrl" column="cover_url"/>
+        <result property="overallProgress" column="overall_progress"/>
+        <result property="currentChapter" column="current_chapter"/>
+        <result property="currentVideo" column="current_video"/>
+        <result property="currentVideoId" column="current_video_id"/>
+        <result property="lastPosition" column="last_position"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- Select paginated study records with course info and aggregated progress -->
+    <select id="selectStudyRecords" resultMap="StudyRecordResponseResultMap">
+        SELECT
+            sr_latest.id,
+            sr_latest.course_id,
+            c.title AS course_title,
+            c.cover_url,
+            COALESCE(
+                (SELECT ROUND(AVG(sr_inner.progress))
+                 FROM study_record sr_inner
+                 WHERE sr_inner.student_id = #{studentId}
+                   AND sr_inner.course_id = sr_latest.course_id),
+                0
+            ) AS overall_progress,
+            ch.title AS current_chapter,
+            cv.title AS current_video,
+            sr_latest.video_id AS current_video_id,
+            sr_latest.last_position,
+            sr_latest.updated_at
+        FROM study_record sr_latest
+        INNER JOIN (
+            SELECT course_id, MAX(updated_at) AS max_updated
+            FROM study_record
+            WHERE student_id = #{studentId}
+            GROUP BY course_id
+        ) latest ON sr_latest.course_id = latest.course_id
+            AND sr_latest.updated_at = latest.max_updated
+            AND sr_latest.student_id = #{studentId}
+        LEFT JOIN course c ON sr_latest.course_id = c.id
+        LEFT JOIN course_video cv ON sr_latest.video_id = cv.id
+        LEFT JOIN course_chapter ch ON cv.chapter_id = ch.id
+        ORDER BY sr_latest.updated_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- Count distinct courses studied by student -->
+    <select id="countStudyRecords" resultType="long">
+        SELECT COUNT(DISTINCT course_id)
+        FROM study_record
+        WHERE student_id = #{studentId}
+    </select>
+
+</mapper>

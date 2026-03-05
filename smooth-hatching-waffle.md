@@ -89,7 +89,9 @@
 - ✅ 资质证明更新
 
 #### 2. 课程管理
-- ✅ 课程创建（标题、分类、价格、描述、视频上传）
+- ✅ 课程创建（标题、分类、价格、描述、封面上传）
+- ✅ 章节管理（添加/编辑/删除/排序章节）
+- ✅ 章节视频管理（上传/编辑/删除/排序视频）
 - ✅ 课程编辑（修改课程信息、价格、状态）
 - ✅ 课程发布（草稿→发布→下线）
 - ✅ 课程列表管理（查看所有课程、统计学员数、收益）
@@ -171,8 +173,11 @@
 - ✅ 文件URL生成与访问
 
 #### 2. 认证与授权
-- ✅ JWT Token认证
-- ✅ Token自动刷新
+- ✅ JWT 双Token认证（Access Token + Refresh Token）
+- ✅ Access Token短期有效（2小时），Refresh Token长期有效（7天）
+- ✅ Token自动刷新（Access Token过期后使用Refresh Token获取新Access Token）
+- ✅ Refresh Token过期后需重新登录
+- ✅ 登出时销毁Refresh Token
 - ✅ 基于角色的权限控制（RBAC）
 - ✅ 接口权限验证
 
@@ -199,7 +204,7 @@
 
 ### 讲师教学流程
 ```
-注册认证 → 等待审核 → 创建课程 → 发布课程 → 评分练习 → 查看收益 → 月度结算
+注册认证 → 等待审核 → 创建课程 → 添加章节 → 上传章节视频 → 发布课程 → 评分练习 → 查看收益 → 月度结算
 ```
 
 ### 管理员管理流程
@@ -223,9 +228,12 @@
 
 **登录功能**
 - 用户名/邮箱 + 密码登录
-- 验证成功后生成JWT Token（有效期24小时）
-- 返回Token和用户信息（ID、昵称、头像、角色）
-- Token用于后续所有需要认证的请求
+- 验证成功后签发双Token：
+  - Access Token（有效期2小时）：用于接口认证
+  - Refresh Token（有效期7天）：用于刷新Access Token
+- Refresh Token存储到数据库（user_refresh_token表）
+- 返回双Token和用户信息（ID、昵称、头像、角色）
+- Access Token用于后续所有需要认证的请求
 
 **个人资料管理**
 - 修改昵称、头像、个人简介
@@ -239,11 +247,13 @@
 - 分页展示所有已发布课程（每页10条）
 - 支持按分类过滤（民谣/古典/电吉他）
 - 支持关键词搜索（课程标题、讲师名称）
-- 显示课程封面、标题、讲师名称、价格、时长
+- 显示课程封面、标题、讲师名称、价格、总时长
 - 显示是否已购买标记
 
 **课程详情**
-- 完整课程信息（标题、分类、价格、时长、描述）
+- 完整课程信息（标题、分类、价格、描述）
+- 课程章节列表（每个章节包含多个视频及时长）
+- 课程总时长（所有视频时长汇总）
 - 讲师信息（头像、昵称、教学经验）
 - 学员评价和评分（如有）
 - 是否已购买、学习进度（如已购买）
@@ -265,14 +275,15 @@
 - 显示当前播放时间和总时长
 
 **进度保存**
-- 每5秒自动保存一次播放位置
-- 记录学习进度百分比（已播放时长/总时长）
-- 用户离开页面时保存最后位置
-- 下次进入课程时自动从上次位置继续播放
+- 按视频级别记录学习进度
+- 每5秒自动保存一次当前视频的播放位置
+- 记录每个视频的播放进度百分比（已播放时长/视频总时长）
+- 用户离开页面时保存最后播放的视频和位置
+- 下次进入课程时自动定位到上次学习的章节视频，从上次位置继续播放
 
 **学习记录**
 - 显示已购课程列表（按最近学习时间排序）
-- 显示每门课程的学习进度、最后学习时间
+- 显示每门课程的整体学习进度、当前学习章节和视频、最后学习时间
 - 支持按课程名称搜索
 - 点击课程可继续学习
 
@@ -328,13 +339,25 @@
 **课程创建**
 - 输入课程信息：标题、分类、价格、描述
 - 上传课程封面（jpg/png，最大5MB）
-- 上传课程视频（mp4/mov，最大500MB）
-- 系统自动获取视频时长
 - 初始状态为DRAFT（草稿）
+
+**章节管理**
+- 为课程添加多个章节（标题、排序）
+- 编辑章节标题和排序
+- 删除章节（同时删除章节下的所有视频）
+- 拖拽排序章节
+
+**章节视频管理**
+- 为章节上传视频（mp4/mov，最大500MB）
+- 系统自动获取视频时长
+- 编辑视频标题和排序
+- 删除视频
+- 支持同一章节下多个视频
 
 **课程编辑**
 - 修改课程信息（标题、分类、价格、描述）
-- 修改课程封面和视频
+- 修改课程封面
+- 管理章节和视频
 - 修改课程状态（DRAFT→PUBLISHED→OFFLINE）
 - 仅DRAFT状态可删除课程
 
@@ -528,8 +551,6 @@ CREATE TABLE course (
   category VARCHAR(50) COMMENT '分类：民谣/古典/电吉他',
   price DECIMAL(10,2) NOT NULL,
   cover_url VARCHAR(255),
-  video_url VARCHAR(255),
-  duration INT COMMENT '时长(秒)',
   description TEXT,
   status ENUM('DRAFT', 'PUBLISHED', 'OFFLINE') DEFAULT 'DRAFT',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -539,23 +560,53 @@ CREATE TABLE course (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-#### 3. 学习记录表 (study_record)
+#### 3. 课程章节表 (course_chapter)
+```sql
+CREATE TABLE course_chapter (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  course_id BIGINT NOT NULL,
+  title VARCHAR(100) NOT NULL,
+  sort_order INT DEFAULT 0 COMMENT '排序序号',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (course_id) REFERENCES course(id),
+  INDEX idx_course (course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 4. 课程视频表 (course_video)
+```sql
+CREATE TABLE course_video (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  chapter_id BIGINT NOT NULL,
+  title VARCHAR(100) NOT NULL,
+  video_url VARCHAR(255) NOT NULL,
+  duration INT DEFAULT 0 COMMENT '时长(秒)',
+  sort_order INT DEFAULT 0 COMMENT '排序序号',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (chapter_id) REFERENCES course_chapter(id),
+  INDEX idx_chapter (chapter_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 5. 学习记录表 (study_record)
 ```sql
 CREATE TABLE study_record (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   student_id BIGINT NOT NULL,
   course_id BIGINT NOT NULL,
-  progress INT DEFAULT 0 COMMENT '进度百分比',
+  video_id BIGINT NOT NULL COMMENT '当前学习的视频ID',
+  progress INT DEFAULT 0 COMMENT '该视频播放进度百分比',
   last_position INT DEFAULT 0 COMMENT '上次播放位置(秒)',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES sys_user(id),
   FOREIGN KEY (course_id) REFERENCES course(id),
-  UNIQUE KEY uk_student_course (student_id, course_id)
+  FOREIGN KEY (video_id) REFERENCES course_video(id),
+  UNIQUE KEY uk_student_video (student_id, course_id, video_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-#### 4. 练习提交表 (practice_submission)
+#### 6. 练习提交表 (practice_submission)
 ```sql
 CREATE TABLE practice_submission (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -573,19 +624,50 @@ CREATE TABLE practice_submission (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-#### 5. 收益流水表 (income_record)
+#### 7. 课程订单表 (course_order)
+```sql
+CREATE TABLE course_order (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  order_no VARCHAR(50) UNIQUE NOT NULL COMMENT '订单编号',
+  student_id BIGINT NOT NULL,
+  course_id BIGINT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL COMMENT '订单金额',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES sys_user(id),
+  FOREIGN KEY (course_id) REFERENCES course(id),
+  INDEX idx_student (student_id),
+  INDEX idx_order_no (order_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 8. 收益流水表 (income_record)
 ```sql
 CREATE TABLE income_record (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   teacher_id BIGINT NOT NULL,
   course_id BIGINT NOT NULL,
-  student_id BIGINT NOT NULL,
+  order_id BIGINT COMMENT '关联订单ID',
   amount DECIMAL(10,2) NOT NULL,
   type ENUM('COURSE_PURCHASE', 'SETTLEMENT') COMMENT '类型',
   settle_month VARCHAR(7) COMMENT '结算月份 YYYY-MM',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (teacher_id) REFERENCES sys_user(id),
+  FOREIGN KEY (order_id) REFERENCES course_order(id),
   INDEX idx_teacher_month (teacher_id, settle_month)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 9. 刷新令牌表 (user_refresh_token)
+```sql
+CREATE TABLE user_refresh_token (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  refresh_token VARCHAR(512) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES sys_user(id),
+  INDEX idx_user (user_id),
+  INDEX idx_token (refresh_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -669,7 +751,9 @@ public class Result<T> {
   "code": 200,
   "message": "登录成功",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresIn": 7200,
     "userInfo": {
       "id": 1,
       "username": "student01",
@@ -683,7 +767,51 @@ public class Result<T> {
 
 ---
 
-#### 1.3 课程列表（分页+过滤）
+#### 1.3 刷新Token
+**接口**: `POST /api/auth/refresh`
+
+**请求头**: 无需认证
+
+**请求体**:
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "刷新成功",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresIn": 7200
+  }
+}
+```
+
+---
+
+#### 1.4 用户登出
+**接口**: `POST /api/auth/logout`
+
+**请求头**: `Authorization: Bearer {token}`
+
+**请求体**: 无
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "登出成功",
+  "data": null
+}
+```
+
+---
+
+#### 1.5 课程列表（分页+过滤）
 **接口**: `GET /api/courses`
 
 **请求头**: `Authorization: Bearer {token}`
@@ -710,7 +838,8 @@ public class Result<T> {
         "category": "民谣",
         "price": 99.00,
         "coverUrl": "https://example.com/cover1.jpg",
-        "duration": 3600,
+        "totalDuration": 3600,
+        "chapterCount": 5,
         "teacherName": "张老师",
         "teacherId": 10,
         "status": "PUBLISHED",
@@ -723,7 +852,7 @@ public class Result<T> {
 
 ---
 
-#### 1.4 课程详情
+#### 1.6 课程详情
 **接口**: `GET /api/courses/{id}`
 
 **请求头**: `Authorization: Bearer {token}`
@@ -741,9 +870,42 @@ public class Result<T> {
     "category": "民谣",
     "price": 99.00,
     "coverUrl": "https://example.com/cover1.jpg",
-    "videoUrl": "https://example.com/video1.mp4",
-    "duration": 3600,
     "description": "适合零基础学员的民谣吉他入门课程",
+    "totalDuration": 3600,
+    "chapters": [
+      {
+        "id": 1,
+        "title": "第一章：基础指法",
+        "sortOrder": 1,
+        "videos": [
+          {
+            "id": 1,
+            "title": "1.1 左手指法练习",
+            "videoUrl": "https://example.com/video1.mp4",
+            "duration": 1200
+          },
+          {
+            "id": 2,
+            "title": "1.2 右手拨弦技巧",
+            "videoUrl": "https://example.com/video2.mp4",
+            "duration": 900
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "第二章：和弦入门",
+        "sortOrder": 2,
+        "videos": [
+          {
+            "id": 3,
+            "title": "2.1 C大调和弦",
+            "videoUrl": "https://example.com/video3.mp4",
+            "duration": 1500
+          }
+        ]
+      }
+    ],
     "teacherInfo": {
       "id": 10,
       "nickname": "张老师",
@@ -757,7 +919,7 @@ public class Result<T> {
 
 ---
 
-#### 1.5 购买课程
+#### 1.7 购买课程
 **接口**: `POST /api/courses/{id}/purchase`
 
 **请求头**: `Authorization: Bearer {token}`
@@ -782,7 +944,38 @@ public class Result<T> {
 
 ---
 
-#### 1.6 我的学习记录
+#### 1.8 我的订单列表
+**接口**: `GET /api/orders`
+
+**请求头**: `Authorization: Bearer {token}`
+
+**查询参数**:
+- `page`: 页码（默认1）
+- `size`: 每页数量（默认10）
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "total": 3,
+    "list": [
+      {
+        "orderNo": "ORD20240305001",
+        "courseId": 1,
+        "courseTitle": "民谣吉他入门教程",
+        "amount": 99.00,
+        "createdAt": "2024-03-05T10:30:00"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### 1.9 我的学习记录
 **接口**: `GET /api/study/records`
 
 **请求头**: `Authorization: Bearer {token}`
@@ -804,8 +997,11 @@ public class Result<T> {
         "courseId": 1,
         "courseTitle": "民谣吉他入门教程",
         "coverUrl": "https://example.com/cover1.jpg",
-        "progress": 65,
-        "lastPosition": 2340,
+        "overallProgress": 65,
+        "currentChapter": "第一章：基础指法",
+        "currentVideo": "1.2 右手拨弦技巧",
+        "currentVideoId": 2,
+        "lastPosition": 450,
         "updatedAt": "2024-03-05T09:30:00"
       }
     ]
@@ -815,7 +1011,7 @@ public class Result<T> {
 
 ---
 
-#### 1.7 更新学习进度
+#### 1.10 更新学习进度
 **接口**: `PUT /api/study/progress`
 
 **请求头**: `Authorization: Bearer {token}`
@@ -824,8 +1020,9 @@ public class Result<T> {
 ```json
 {
   "courseId": 1,
+  "videoId": 2,
   "progress": 70,
-  "lastPosition": 2520
+  "lastPosition": 450
 }
 ```
 
@@ -840,7 +1037,7 @@ public class Result<T> {
 
 ---
 
-#### 1.8 提交练习视频
+#### 1.11 提交练习视频
 **接口**: `POST /api/practice/submit`
 
 **请求头**:
@@ -867,7 +1064,7 @@ public class Result<T> {
 
 ---
 
-#### 1.9 我的练习列表
+#### 1.12 我的练习列表
 **接口**: `GET /api/practice/list`
 
 **请求头**: `Authorization: Bearer {token}`
