@@ -1,0 +1,57 @@
+# ===========================
+# Java / Maven (Backend)
+# ===========================
+guitar-platform-backend/target/
+guitar-platform-backend/.mvn/wrapper/maven-wrapper.jar
+guitar-platform-backend/*.class
+guitar-platform-backend/*.jar
+guitar-platform-backend/*.war
+guitar-platform-backend/*.ear
+guitar-platform-backend/*.nar
+guitar-platform-backend/hs_err_pid*
+
+# Maven local repo cache
+.m2/
+
+# ===========================
+# Node.js / Vite (Frontend)
+# ===========================
+guitar-platform-frontend/node_modules/
+guitar-platform-frontend/dist/
+guitar-platform-frontend/.vite/
+guitar-platform-frontend/package-lock.json
+
+# ===========================
+# IDE & Editor
+# ===========================
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ===========================
+# Docker
+# ===========================
+docker-compose.override.yml
+
+# ===========================
+# Logs
+# ===========================
+*.log
+logs/
+# 敏感配置文件 (建议只留一个模版 application.yml.example)
+guitar-platform-backend/src/main/resources/application.yml
+guitar-platform-backend/src/main/resources/application-prod.yml
+application.yml
+application-prod.yml
